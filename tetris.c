@@ -215,39 +215,43 @@ bool falling_move (int dx, int dy) {
     bool placed = false;
 
     force_move(&temp_shape, dx, dy);
+    bool intersecting = intersecting_falling(temp_shape.squares);
 
-    if (!intersecting_falling(temp_shape.squares)) {
+    if (!intersecting) {
         falling_shape = temp_shape;
         down_conf = false;
         render();
-    
-    } else if (dx == 0 && dy == 1) {
-        if (down_conf) {
-            falling_place();
-            placed = true;
-            drop_time = DROPTIME(pieces_placed);
-            render();
-        }
-
-        down_conf = !down_conf;
     }
 
-    drop_timer = drop_time;
+    if (dx == 0 && dy == 1) {
+        drop_timer = drop_time;
+
+        if (intersecting) {
+            if (down_conf) {
+                falling_place();
+                placed = true;
+                drop_time = DROPTIME(pieces_placed);
+                render();
+            }
+
+            down_conf = !down_conf;
+        }
+    }
+
     return placed;
 }
 
 
 void falling_drop () {
 #if SPACE_DROP_CONFIRMS
-    if (!falling_move(0, 1)) {
-        bool placed = false;
-        do
-            placed = falling_move(0, 1);
-        while (!down_conf && !placed);
+    // Drop piece to ground but don't place it, unless it's already on ground
+    if (!falling_move(0, 1)) {  // If it hasn't just placed...
+        do; while (!falling_move(0, 1) && !down_conf);  // Drop again until it's placed or is about to be placed
     }
+    down_conf = false;
 #else
-    while (!down_conf) falling_move(0, 1);
-    falling_move(0, 1);
+    // Drop piece until it's placed
+    while (!falling_move(0, 1));
 #endif
 }
 
