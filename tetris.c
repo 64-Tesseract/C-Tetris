@@ -9,6 +9,7 @@
 
 
 bool playing = true;
+bool paused = false;
 int grid[200] = {0};
 int top_row = 20;
 int last_cols = 0;
@@ -36,8 +37,16 @@ void draw_border (int dx) {
         }
 
     } else {
+        mvprintw(20, dx - 1, "'");
+        mvprintw(20, dx + 20, "'");
+
         for (int n = 0; n < 10; n++) {
             mvprintw(20, dx + n * 2, "==");
+        }
+
+        for (int n = 0; n < 20; n++) {
+            mvprintw(n, dx - 1, "|");
+            mvprintw(n, dx + 20, "|");
         }
     }
 }
@@ -90,16 +99,22 @@ void render () {
 
     } else {
         attrset(COLOR_PAIR(0));
-        mvprintw(8, dx + 21, "%x", pieces_placed);
-        mvprintw(12, dx + 21, "%x", score);
+        mvprintw(8, dx + 22, "%x", pieces_placed);
+        mvprintw(12, dx + 22, "%x", score);
 
         attrset(COLOR_PAIR(next_shape.colour + 7));
-        mvprintw(0, dx + 21, "%c", next_shape.symbol);
+        mvprintw(0, dx + 22, "%c", next_shape.symbol);
 
         if (shape_saved) {
             attrset(COLOR_PAIR(saved_shape.colour + 7));
-            mvprintw(4, dx + 21, "%c", saved_shape.symbol);
+            mvprintw(4, dx + 22, "%c", saved_shape.symbol);
         }
+    }
+
+    if (paused) {
+        attrset(COLOR_PAIR(0));
+        mvprintw(9, dx + 7, "PAUSED");
+        mvprintw(10, dx + 3, "(p to resume)");
     }
 }
 
@@ -216,16 +231,16 @@ bool falling_move (int dx, int dy) {
 
     force_move(&temp_shape, dx, dy);
     bool intersecting = intersecting_falling(temp_shape.squares);
+    bool down = dx == 0 && dy == 1;
 
     if (!intersecting) {
         falling_shape = temp_shape;
+        if (down_conf) drop_timer = drop_time;
         down_conf = false;
         render();
     }
 
-    if (dx == 0 && dy == 1) {
-        drop_timer = drop_time;
-
+    if (down) {
         if (intersecting) {
             if (down_conf) {
                 falling_place();
@@ -236,6 +251,8 @@ bool falling_move (int dx, int dy) {
 
             down_conf = !down_conf;
         }
+
+        drop_timer = drop_time;
     }
 
     return placed;
@@ -303,48 +320,57 @@ int main (int argc, char *argv[]) {
     render();
 
     while (playing) {
-        switch (getch()) {
-            case 'a':
-            case 'h':
-                falling_move(-1, 0);
-                break;
-            case 'd':
-            case 'l':
-                falling_move(1, 0);
-                break;
-            case 's':
-                falling_move(0, 1);
-                break;
-            case '[':
-            case 'j':
-                falling_spin(-1);
-                break;
-            case ']':
-            case 'k':
-                falling_spin(1);
-                break;
-            case ' ':
-                falling_drop();
-                break;
-            case 'q':
-            case 'c':
-                save_shape();
-                break;
-        }
+        char c = getch();
 
-        if (drop_timer-- <= 0)
-            falling_move(0, 1);
+        if (c == 'p') {
+            paused = !paused;
+            render();
+        } else if (!paused) {
+            switch (c) {
+                case 'a':
+                case 'h':
+                    falling_move(-1, 0);
+                    break;
+                case 'd':
+                case 'l':
+                    falling_move(1, 0);
+                    break;
+                case 's':
+                    falling_move(0, 1);
+                    break;
+                case '[':
+                case 'j':
+                    falling_spin(-1);
+                    break;
+                case ']':
+                case 'k':
+                    falling_spin(1);
+                    break;
+                case ' ':
+                    falling_drop();
+                    break;
+                case 'q':
+                case 'c':
+                    save_shape();
+                    break;
+            }
+        }
 
         if (last_cols != COLS) {
             last_cols = COLS;
             render();
         }
 
+        if (!paused) {
+            if (drop_timer-- <= 0)
+                falling_move(0, 1);
+        }
+
         refresh();
         usleep(10000);
     }
     
-    usleep(10000);
+    usleep(100000);
     while (getch() == ERR) usleep(10000);
     
     endwin();
